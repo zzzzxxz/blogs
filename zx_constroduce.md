@@ -384,3 +384,175 @@ ES与关系型数据库概念对比
 索引：数据库
 类型：表
 文档：行
+
+核心类型（Core datatype）
+字符串：string，string类型包含 text 和 keyword。
+text：该类型被用来索引长文本，在创建索引前会将这些文本进行分词，转化为词的组合，建立索引；允许es来检索这些词，text类型不能用来排序和聚合。
+keyword：该类型不需要进行分词，可以被用来检索过滤、排序和聚合，keyword类型自读那只能用本身来进行检索（不可用text分词后的模糊检索）。
+数指型：long、integer、short、byte、double、float
+日期型：date
+布尔型：boolean
+二进制型：binary
+除字符串类型以外，其他类型必须要进行精确查询，因为除字符串外其他类型不会进行分词。
+复杂数据类型（Complex datatypes）
+字符型数组：[“one”，“two”]
+数组型数组：[1, [2, 3]] 等价于 [1, 2, 3]
+对象数组：[{“name”: “Mary”, “age”: 12}, {“name”: “John”, “age”: 10}]
+对象类型（Object datatype）：object 用于单个Json对象
+嵌套类型（Nested datatype）：nested 用于Json数组
+
+地理位置类型（Geo datatypes）
+地理坐标类型（Geo-point datatype）：geo_point 用于经纬度坐标
+地理形状类型（Geo-Shape datatype）：geo_shape 用于类似于多边形的复杂形状
+
+
+map属性分析
+enabled：仅存储、不做搜索和聚合分析 （默认为true)
+index：是否构建倒排索引（即是否分词，设置false，字段将不会被索引）（默认为true）
+当index为analyzed时，该字段是分析字段，ElasticSearch引擎对该字段执行分析操作，把文本分割成分词流，存储在倒排索引中，使其支持全文搜索；
+当index为not_analyzed时，该字段不会被分析，ElasticSearch引擎把原始文本作为单个分词存储在倒排索引中，不支持全文搜索，但是支持词条级别的搜索；也就是说，字段的原始文本不经过分析而存储在倒排索引中，把原始文本编入索引，在搜索的过程中，查询条件必须全部匹配整个原始文本；
+当index为no时，该字段不会被存储到倒排索引中，不会被搜索到；
+
+store用于获取（Retrieve）字段的原始值，不支持查询，可以使用投影参数fields，对stroe属性为true的字段进行过滤，只获取（Retrieve）特定的字段，减少网络负载；
+index用于查询（Search）字段，当index为analyzed时，对字段的分词执行全文查询；当index为not_analyzed时，字段的原始值作为一个分词，只能对字段的原始文本执行词条查询；
+
+
+
+term index存储结构
+
+
+index_option：存储倒排索引的哪些信息
+4个可选参数
+docs：索引文档号
+freqs：文档号+词频
+positions：文档号+词频+位置，通常用来距离查询
+offsets：文档号+词频+位置+偏移量，通常被使用在高亮字段
+分词字段默认时positions，其他默认时docs
+
+doc_value：是否开启doc_value，用户聚合和排序分析
+对not_analyzed字段，默认都是开启，分词字段不能使用，对排序和聚合能提升较大性能，节约内存
+
+fielddata：是否为text类型启动fielddata，实现排序和聚合分析
+针对分词字段，参与排序或聚合时能提高性能，不分词字段统一建议使用doc_value
+fielddata数据结构存储在JVM的堆内存中
+在第一次对字段执行聚合或排序查询时（（query-time）），创建fielddata数据结构
+
+
+
+集群存储结构
+
+
+1个索引	
+2个分片，每个分片3份副本replica
+3个节点
+6个copy
+
+
+创建索引
+PUT /my-index
+{
+  "mappings": {
+    "properties": {
+      "age":    { "type": "integer" },  
+      "email":  { "type": "keyword"  }, 
+      "name":   { "type": "text"  }     
+    }
+  },
+  "settings": {
+    "number_of_replicas": 1,
+    "number_of_shards": 3
+  }
+}
+
+检查集群健康状态
+GET : http://10.45.154.174:9200/_cluster/health/
+{
+"cluster_name": "lv174.dct-znv.com-es",			#集群名称
+"status": "yellow",							#为green代表健康没问题，yellow（说明有shard没有分配存储位置）或者red（表示集群有重大错误不能运行）表示有问题
+"timed_out": false,							#是否超时
+"number_of_nodes": 1,						#集群中的节点数量
+"number_of_data_nodes": 1,
+"active_primary_shards": 292,				#可用主分片数量
+"active_shards": 292,						#可用分片总数
+"relocating_shards": 0,
+"initializing_shards": 0,
+"unassigned_shards": 36,					#未分配的分片
+"delayed_unassigned_shards": 0,
+"number_of_pending_tasks": 0,
+"number_of_in_flight_fetch": 0,
+"task_max_waiting_in_queue_millis": 0,
+"active_shards_percent_as_number": 89.02439024390245
+}
+
+
+多维管控中使用的索引介绍，ES head使用介绍
+scms_vehicle_1/pass_data						过车事件
+scms_iot_1/iot_data							动环数据
+scms_iot_gps_1/iot_gps							gps信息
+bap-es-event-face-v1-0/face_event_data			人脸抓拍
+scms_door/t_event_door						门禁事件
+wifi_probe_1/mt_data|ap_data					wifi探针数据
+
+
+ElasticSearch-head插件安装与使用说明
+1）chrome head插件
+google被河蟹所以需要自己下载插件（0.1.3-0.1.4）
+chromeFOR.COM_elasticsearch-head_v0.1.3.crx
+在地址栏输入：
+chrome://extensions/
+将插件拖入
+
+
+安装完之后界面，点击右上角的放大镜图标
+输入地址：http://10.45.154.177:9200/
+
+
+
+2）Head服务器部署（nodejs服务）
+es5以上版本安装head需要安装node和grunt(之前的直接用plugin命令即可安装)
+(一)从地址：https://nodejs.org/en/download/ 下载相应系统的msi，双击安装。
+
+（二）安装完成用cmd进入安装目录执行 node -v可查看版本号
+
+（三）执行 npm install -g grunt-cli 安装grunt ，安装完成后执行grunt -version查看是否安装成功，会显示安装的版本号
+
+（四）开始安装head
+① 进入安装目录下的config目录，修改elasticsearch.yml文件.在文件的末尾加入以下代码
+http.cors.enabled: true 
+http.cors.allow-origin: "*"
+node.master: true
+node.data: true
+然后去掉network.host: 192.168.0.1的注释并改为network.host: 0.0.0.0，去掉cluster.name；node.name；http.port的注释（也就是去掉#）
+②双击elasticsearch.bat重启es
+③在https://github.com/mobz/elasticsearch-head中下载head插件，选择下载zip
+
+④解压到指定文件夹下，G:\elasticsearch-6.6.2\elasticsearch-head-master  进入该文件夹，修改G:\elasticsearch-6.6.2\elasticsearch-head-master\Gruntfile.js 在对应的位置加上hostname:'*'
+
+⑤在G:\elasticsearch-6.6.2\elasticsearch-head-master  下执行npm install 安装完成后执行grunt server 或者npm run start 运行head插件，如果不成功重新安装grunt。成功如下
+
+⑥浏览器下访问http://localhost:9100/
+
+成功。
+es连接地址输入：
+http://10.45.154.177:9200/
+
+
+3）head的使用
+查看索引状态
+
+数据浏览
+
+数据查询
+
+
+
+
+
+
+
+引用：
+1）文档地址：https://10.72.66.8:8443/nms/ZNV-R/trunk/Public/文档资料/标准规范
+2）https://blog.csdn.net/gongpulin/article/details/78568973
+3）https://blog.csdn.net/zx711166/article/details/81667862
+4）https://www.cnblogs.com/kevingrace/p/10671063.html
+5）https://www.elastic.co/guide/cn/elasticsearch/guide/current/index-doc.html
